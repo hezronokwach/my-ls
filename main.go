@@ -19,7 +19,6 @@ func main() {
 		"l": false,
 	}
 	var filestore []string
-	// Parse command-line arguments for flags and target paths.
 	for _, arg := range os.Args[1:] {
 		if arg[0] == '-' {
 			for _, flag := range arg[1:] {
@@ -41,7 +40,7 @@ func main() {
 		}
 	}
 
-	if len(filestore) == 0 { // Default to current directory if no path is provided.
+	if len(filestore) == 0 { 
 		filestore = append(filestore, ".")
 	}
 	if flags["l"] {
@@ -174,7 +173,7 @@ func longList(files []string) {
 			size := fileInfo.Size()
 			permission := fileInfo.Mode()
 			name := fileInfo.Name()
-			time := fileInfo.ModTime().Format("Jan 2 15:04") // Mon Jan 2 15:04:05 -0700 MST 2006
+			time := fileInfo.ModTime().Format("Jan 2 15:04") // Mon Jan 2 15:04:05 2006
 			user := userGroup()
 			hardlinks := fileInfo.Sys().(*syscall.Stat_t).Nlink
 			format := fmt.Sprintf("%v %d %v %v %v %s", permission, hardlinks, user, size, time, name)
@@ -244,12 +243,9 @@ func userGroup() string {
 
 func SortStringsDescending(slice []string) []string {
 	n := len(slice)
-	// Bubble sort algorithm
 	for i := 0; i < n-1; i++ {
 		for j := 0; j < n-i-1; j++ {
-			// Compare adjacent elements
 			if slice[j] < slice[j+1] {
-				// Swap if they are in the wrong order
 				slice[j], slice[j+1] = slice[j+1], slice[j]
 			}
 		}
