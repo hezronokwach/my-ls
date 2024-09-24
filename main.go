@@ -5,6 +5,8 @@ import (
 	"io/fs"
 	"os"
 	"os/user"
+	"path/filepath"
+	"sort"
 	"syscall"
 )
 
@@ -19,16 +21,21 @@ func main() {
 	var filestore []string
 	// Parse command-line arguments for flags and target paths.
 	for _, arg := range os.Args[1:] {
-		if arg == "-a" || arg == "--all" {
-			flags["a"] = true
-		} else if arg == "-r" || arg == "--reverse" {
-			flags["r"] = true
-		} else if arg == "-t" || arg == "--time" {
-			flags["t"] = true
-		} else if arg == "-R" || arg == "--recursive" {
-			flags["R"] = true
-		} else if arg == "-l" || arg == "--recursive" {
-			flags["l"] = true
+		if arg[0] == '-' {
+			for _, flag := range arg[1:] {
+				switch flag {
+				case 'a':
+					flags["a"] = true
+				case 'r':
+					flags["r"] = true
+				case 't':
+					flags["t"] = true
+				case 'R':
+					flags["R"] = true
+				case 'l':
+					flags["l"] = true
+				}
+			}
 		} else {
 			filestore = append(filestore, arg)
 		}
@@ -74,22 +81,26 @@ func shortList(filestore []string, flags map[string]bool) {
 				validFiles = append(validFiles, file)
 			}
 		} else {
-			dirContents := directoryList([]string{}, file)
-			if flags["t"] {
-				dirContents = sortFilesByModTime(dirContents)
-			} else if flags["r"] {
-				dirContents = SortStringsDescending(dirContents)
-			}
-			for _, entry := range dirContents {
-				if flags["a"] || entry[0] != '.' {
-					directories = append(directories, entry)
+			if flags["R"] {
+				listRecursive(file, flags, "")
+			} else {
+				dirContents := directoryList([]string{}, file)
+				if flags["t"] {
+					dirContents = sortFilesByModTime(dirContents)
+				} else if flags["r"] {
+					dirContents = SortStringsDescending(dirContents)
 				}
-			}
-			if flags["a"] {
-				directories = append([]string{".", ".."}, directories...)
 				for _, entry := range dirContents {
-					if entry[0] == '.' && entry != "." && entry != ".." {
+					if flags["a"] || entry[0] != '.' {
 						directories = append(directories, entry)
+					}
+				}
+				if flags["a"] {
+					directories = append([]string{".", ".."}, directories...)
+					for _, entry := range dirContents {
+						if entry[0] == '.' && entry != "." && entry != ".." {
+							directories = append(directories, entry)
+						}
 					}
 				}
 			}
@@ -99,10 +110,12 @@ func shortList(filestore []string, flags map[string]bool) {
 	if len(validFiles) > 0 {
 		printShort(validFiles)
 	}
-	if len(validFiles) > 0 && len(directories) > 0 {
+	if len(validFiles) > 0 && len(directories) > 0 && !flags["R"] {
 		fmt.Println()
 	}
-	printShort(directories)
+	if !flags["R"] {
+		printShort(directories)
+	}
 }
 
 func directoryList(dircontent []string, file string) []string {
@@ -174,6 +187,44 @@ func longList(files []string) {
 	print(message)
 	print(validFiles)
 	print(directories)
+}
+
+func listRecursive(path string, flags map[string]bool, indent string) {
+	files, err := os.ReadDir(path)
+	if err != nil {
+		fmt.Printf("Error reading directory %s: %v\n", path, err)
+		return
+	}
+
+	fmt.Printf("%s%s:\n", indent, path)
+	var entries []string
+	for _, file := range files {
+		if flags["a"] || file.Name()[0] != '.' {
+			entries = append(entries, file.Name())
+		}
+	}
+
+	if flags["t"] {
+		entries = sortFilesByModTime(entries)
+	} else if flags["r"] {
+		entries = SortStringsDescending(entries)
+	} else {
+		sort.Strings(entries)
+	}
+
+	printShort(entries)
+	fmt.Println()
+
+	for _, entry := range entries {
+		fullPath := filepath.Join(path, entry)
+		info, err := os.Stat(fullPath)
+		if err != nil {
+			continue
+		}
+		if info.IsDir() {
+			listRecursive(fullPath, flags, indent+"  ")
+		}
+	}
 }
 
 func userGroup() string {
